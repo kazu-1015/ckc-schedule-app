@@ -1,0 +1,2613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>スケジュールアプリ（週×メンバー＋月表示＋定期予定）</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.08);
+      --accent-border: #1d4ed8;
+      --danger: #ef4444;
+      --surface: #f9fafb;
+      --border: #e2e8f0;
+      --text-muted: #64748b;
+      --bg: #e5edf8;
+      --today-col: #fff7e6;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #e0ebff, #eef2ff 55%, #e5edf8);
+      color: #0f172a;
+    }
+
+    header {
+      background: linear-gradient(120deg, #2563eb, #1e40af);
+      color: #fff;
+      padding: 16px 24px 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: 0.06em;
+    }
+
+    .toolbar {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .range {
+      font-weight: 600;
+      font-size: 0.98rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.2);
+      backdrop-filter: blur(4px);
+    }
+
+    .nav-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-buttons {
+      display: inline-flex;
+      border-radius: 999px;
+      overflow: hidden;
+      padding: 2px;
+      background: rgba(15, 23, 42, 0.25);
+    }
+
+    .nav-buttons button {
+      background: transparent;
+      color: #e5edff;
+      border: none;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-radius: 999px;
+      transition: background 0.15s, color 0.15s, transform 0.05s;
+    }
+
+    .nav-buttons button:hover {
+      background: rgba(15, 23, 42, 0.35);
+    }
+
+    .nav-buttons button:active {
+      transform: translateY(1px);
+    }
+
+    .dept-switch {
+      display: inline-flex;
+      padding: 2px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.25);
+      gap: 2px;
+    }
+
+    .dept-switch button {
+      background: transparent;
+      color: #e5edff;
+      border: none;
+      padding: 5px 12px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      border-radius: 999px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .dept-switch button.active {
+      background: #e5edff;
+      color: #1e40af;
+    }
+
+    .view-actions {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    main {
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .calendar-shell {
+      background: rgba(248, 250, 252, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      border-radius: 16px;
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.16),
+        0 0 0 1px rgba(255, 255, 255, 0.7);
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+
+    .calendar-heading {
+      padding: 10px 16px 8px;
+      background: linear-gradient(90deg, #eff4ff, #e0ecff);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.7);
+      font-weight: 600;
+      color: #1d4ed8;
+      font-size: 0.98rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .calendar-heading span.sub {
+      font-size: 0.8rem;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .month-heading-main span.sub {
+      display: block;
+    }
+
+    .month-nav {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .member-grid-wrapper {
+      overflow: auto;
+    }
+
+    .member-grid {
+      display: grid;
+      grid-template-columns: 180px repeat(7, minmax(120px, 1fr));
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      min-width: 980px;
+      background: #f9fafb;
+    }
+
+    .member-header-cell,
+    .member-name-cell,
+    .day-cell {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 8px;
+      position: relative;
+    }
+
+    .member-header-cell {
+      background: #eff4ff;
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: #1e293b;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      justify-content: center;
+      height: 54px;
+    }
+
+    .member-header-cell .weekday {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .member-header-cell.sun {
+      color: #b91c1c;
+    }
+
+    .member-header-cell.sat {
+      color: #1d4ed8;
+    }
+
+    .member-name-cell {
+      background: linear-gradient(180deg, #f8fafc, #e5edff);
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #0f172a;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .member-name-cell::before {
+      content: "";
+      width: 6px;
+      height: 24px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+      margin-right: 4px;
+    }
+
+    .member-name-main {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1 1 auto;
+    }
+
+    .member-month-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.9);
+      background: #ffffff;
+      color: #1e40af;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      flex: 0 0 auto;
+    }
+
+    .member-month-btn:hover {
+      background: #e5edff;
+      border-color: #1d4ed8;
+      color: #1d4ed8;
+    }
+
+    .day-cell {
+      min-height: 90px;
+      cursor: pointer;
+      background: #ffffff;
+      transition: background 0.12s, box-shadow 0.12s;
+    }
+
+    .day-cell.today {
+      background: var(--today-col);
+    }
+
+    .day-cell:hover {
+      background: #eef2ff;
+      box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.5);
+    }
+
+    .day-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      position: absolute;
+      top: 4px;
+      right: 6px;
+    }
+
+    .event-stack {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .event-bar {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      cursor: pointer;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      border-left-width: 4px;
+      background: #f9fafb;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+      transition: transform 0.06s, box-shadow 0.12s, background 0.12s, border-color 0.12s;
+    }
+
+    .event-bar:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+      background: #eef2ff;
+      border-color: rgba(129, 140, 248, 0.7);
+    }
+
+    .event-bar .time {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .event-bar .title {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .event-bar.dragging {
+      opacity: 0.6;
+    }
+
+    /* 月表示用グリッド */
+    .month-grid {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      background: #f9fafb;
+    }
+
+    .month-row {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .month-weekday-row .day-cell {
+      min-height: 32px;
+      background: #eff4ff;
+      cursor: default;
+      font-weight: 600;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 4px;
+    }
+
+    .month-weekday-row .day-cell .day-label {
+      position: static;
+      font-size: 0.8rem;
+      color: #1e293b;
+    }
+
+    .month-day-cell {
+      min-height: 96px;
+    }
+
+    .month-day-cell.outside-month {
+      background: #f3f4f6;
+      color: #9ca3af;
+    }
+
+    dialog::backdrop {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(3px);
+    }
+
+    dialog {
+      border: none;
+      border-radius: 16px;
+      padding: 0;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.45);
+      width: min(480px, 92vw);
+      background: #f9fafb;
+    }
+
+    .dialog-body {
+      padding: 20px 24px 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .dialog-body h3 {
+      margin: 0;
+      font-size: 1.15rem;
+      color: #0f172a;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .required-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: inherit;
+    }
+
+    .required-star {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    textarea,
+    select {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.95rem;
+      background: #ffffff;
+      width: 100%;
+      outline: none;
+      transition: border 0.15s, box-shadow 0.15s;
+    }
+
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    input[type="number"]:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .time-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    .time-row .time-select-group {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .time-row .all-day-option {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px 12px;
+      min-height: 56px;
+      flex: 0 0 auto;
+    }
+
+    .time-row .all-day-option input {
+      accent-color: var(--accent);
+    }
+
+    .time-select-group .time-selectors {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .time-selectors select {
+      width: auto;
+      min-width: 80px;
+    }
+
+    .time-selectors span {
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    fieldset.tag-field {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin: 0;
+      padding: 10px 12px 8px;
+      display: grid;
+      gap: 8px;
+      background: #ffffff;
+    }
+
+    fieldset.tag-field legend {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      padding: 0 4px;
+    }
+
+    .tag-options {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      padding-bottom: 4px;
+    }
+
+    .tag-option,
+    .repeat-tag-option {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: #0f172a;
+      transition: border 0.15s, box-shadow 0.15s, background 0.15s;
+      min-width: 0;
+    }
+
+    .tag-option input,
+    .repeat-tag-option input {
+      accent-color: var(--accent);
+    }
+
+    .tag-option.active,
+    .repeat-tag-option.active {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+      background: #eef2ff;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding: 0 24px 18px 24px;
+    }
+
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger {
+      border: none;
+      border-radius: 999px;
+      padding: 9px 16px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, transform 0.05s, box-shadow 0.15s;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: #e5edff;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: #1d4ed8;
+      border: 1px solid rgba(148, 163, 184, 0.9);
+    }
+
+    .btn-secondary:hover {
+      background: #e5edff;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fee2e2;
+      box-shadow: 0 6px 16px rgba(248, 113, 113, 0.5);
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-xs {
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      box-shadow: none;
+    }
+
+    .btn-primary:active,
+    .btn-secondary:active,
+    .btn-danger:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    .help-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin: 2px 0 0;
+    }
+
+    .weekday-checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .weekday-checkboxes label {
+      flex-direction: row;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* メンバー用チェックボックス */
+    .member-checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .repeat-member-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .repeat-member-item input {
+      accent-color: var(--accent);
+    }
+
+    .repeat-member-item:hover {
+      background: #eef2ff;
+      border-color: var(--accent-border);
+    }
+
+    @media (max-width: 900px) {
+      header {
+        padding: 14px 18px 10px;
+      }
+
+      header h1 {
+        font-size: 1.18rem;
+      }
+
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .range {
+        order: -1;
+        width: 100%;
+        font-size: 0.9rem;
+        text-align: center;
+      }
+
+      .nav-wrapper {
+        width: 100%;
+        justify-content: center;
+      }
+
+      main {
+        padding: 18px 16px;
+      }
+
+      .member-grid {
+        min-width: 760px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 12px 14px 8px;
+      }
+
+      header h1 {
+        font-size: 1.05rem;
+      }
+
+      .toolbar {
+        gap: 8px;
+      }
+
+      .range {
+        font-size: 0.84rem;
+      }
+
+      main {
+        padding: 14px 10px 18px;
+      }
+
+      .member-grid {
+        min-width: 640px;
+      }
+    }
+
+    /* 印刷用スタイル（週ビューのみ印刷） */
+    @media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #weekShell,
+  #weekShell * {
+    visibility: visible;
+  }
+
+  #weekShell {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .member-grid-wrapper {
+    overflow: visible;
+  }
+
+  .member-grid {
+    min-width: 0;
+    width: 100%;
+    /* ★土日非表示で「メンバー + 月〜金」の6列が必ず収まるように幅を強制 */
+    grid-template-columns: 130px repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .member-header-cell,
+  .member-name-cell,
+  .day-cell {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  .event-bar {
+    font-size: 9px;
+    padding: 4px 6px;
+    box-shadow: none;
+  }
+}
+  </style>
+</head>
+<body>
+  <!-- ▼▼▼ ログイン画面 ▼▼▼ -->
+  <div id="loginSection" style="
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    background:#eef2ff;
+    gap:16px;
+  ">
+    <h2 style="color:#1e3a8a;">スケジュールアプリ ログイン</h2>
+
+    <div style="display:flex; flex-direction:column; gap:8px; width:260px;">
+      <input id="loginId" type="text" placeholder="ID" style="padding:10px; border-radius:6px;">
+      <input id="loginPw" type="password" placeholder="パスワード" style="padding:10px; border-radius:6px;">
+      <button id="loginBtn" style="
+        padding:10px;
+        border-radius:6px;
+        background:#2563eb;
+        color:white;
+        cursor:pointer;
+        font-weight:600;
+      ">ログイン</button>
+      <div id="loginError" style="color:red; font-size:0.85rem; height:1em;"></div>
+    </div>
+  </div>
+
+  <!-- ▼▼▼ アプリ本体（ここから全部を包む） ▼▼▼ -->
+  <div id="appSection" style="display:none;">
+  <header>
+    <h1>スケジュールアプリ（週×メンバー）</h1>
+    <div class="toolbar">
+      <span class="range" id="rangeLabel"></span>
+
+      <div class="nav-wrapper">
+        <div class="nav-buttons" id="weekNav">
+          <button type="button" id="weekPrevWeekBtn">＜＜ 前週</button>
+          <button type="button" id="weekPrevDayBtn">＜ 前日</button>
+          <button type="button" id="weekTodayBtn">今日</button>
+          <button type="button" id="weekNextDayBtn">翌日 ＞</button>
+          <button type="button" id="weekNextWeekBtn">翌週 ＞＞</button>
+        </div>
+      </div>
+
+      <div class="dept-switch" id="deptSwitch">
+        <button type="button" data-dept="生産係" class="active">生産係</button>
+        <button type="button" data-dept="生産技術">生産技術</button>
+      </div>
+
+      <div class="view-actions">
+        <button type="button" class="btn-secondary" id="weekendToggleBtn">土日：表示中</button>
+        <button type="button" class="btn-primary" id="openRepeatBtn">定期的な予定</button>
+        <button type="button" class="btn-secondary" id="printBtn">印刷</button>
+        <button type="button" class="btn-secondary" id="logoutBtn">ログアウト</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="calendar-shell" id="weekShell">
+      <div class="calendar-heading" id="weekTitle">
+        <span id="weekTitleMain"></span>
+        <span class="sub" id="weekTitleSub"></span>
+      </div>
+      <div class="member-grid-wrapper">
+        <div class="member-grid" id="memberGrid">
+          <!-- JSで生成 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- メンバー別・月表示カレンダー -->
+    <section class="calendar-shell" id="monthShell" hidden>
+      <div class="calendar-heading" id="monthHeading">
+        <div class="month-heading-main">
+          <span id="monthTitle"></span>
+          <span class="sub" id="monthMemberLabel"></span>
+        </div>
+        <div class="month-nav">
+          <button type="button" class="btn-secondary btn-xs" id="monthPrevBtn">＜ 前月</button>
+          <button type="button" class="btn-secondary btn-xs" id="monthThisBtn">今月</button>
+          <button type="button" class="btn-secondary btn-xs" id="monthNextBtn">翌月 ＞</button>
+        </div>
+      </div>
+      <div class="member-grid-wrapper">
+        <div class="month-grid" id="monthGrid">
+          <!-- JSで生成 -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 単発予定用ダイアログ -->
+  <dialog id="scheduleDialog">
+    <form id="scheduleForm">
+      <div class="dialog-body">
+        <h3 id="dialogHeading">予定を登録</h3>
+
+        <label>
+          担当者
+          <input type="text" id="dialogUserName" name="userName" readonly />
+          <input type="hidden" id="dialogUserId" name="userId" />
+        </label>
+
+        <label>
+          <span class="required-label"><span class="required-star">*</span>開始日</span>
+          <input type="date" id="dialogStartDate" name="startDate" required />
+        </label>
+        <label>
+          <span class="required-label"><span class="required-star">*</span>終了日</span>
+          <input type="date" id="dialogEndDate" name="endDate" required />
+        </label>
+
+        <fieldset class="tag-field">
+          <legend>タグ</legend>
+          <div class="tag-options" id="tagOptions">
+            <label class="tag-option" data-tag-value=""><input type="radio" name="tag" value="" />なし</label>
+            <label class="tag-option" data-tag-value="guest"><input type="radio" name="tag" value="guest" />来客</label>
+            <label class="tag-option" data-tag-value="meeting"><input type="radio" name="tag" value="meeting" />会議</label>
+            <label class="tag-option" data-tag-value="outing"><input type="radio" name="tag" value="outing" />外出</label>
+            <label class="tag-option" data-tag-value="holiday"><input type="radio" name="tag" value="holiday" />休日</label>
+          </div>
+        </fieldset>
+
+        <div class="time-row">
+          <label class="time-select-group">
+            開始時間
+            <div class="time-selectors">
+              <select id="dialogStartHour" name="startHour">
+                <option value="">--</option>
+                <option value="00">00</option><option value="01">01</option><option value="02">02</option>
+                <option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                <option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                <option value="09">09</option><option value="10">10</option><option value="11">11</option>
+                <option value="12">12</option><option value="13">13</option><option value="14">14</option>
+                <option value="15">15</option><option value="16">16</option><option value="17">17</option>
+                <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+              </select>
+              <span>:</span>
+              <select id="dialogStartMinute" name="startMinute" disabled>
+                <option value="">--</option>
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
+          </label>
+          <label class="time-select-group">
+            終了時間
+            <div class="time-selectors">
+              <select id="dialogEndHour" name="endHour">
+                <option value="">--</option>
+                <option value="00">00</option><option value="01">01</option><option value="02">02</option>
+                <option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                <option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                <option value="09">09</option><option value="10">10</option><option value="11">11</option>
+                <option value="12">12</option><option value="13">13</option><option value="14">14</option>
+                <option value="15">15</option><option value="16">16</option><option value="17">17</option>
+                <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+              </select>
+              <span>:</span>
+              <select id="dialogEndMinute" name="endMinute" disabled>
+                <option value="">--</option>
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
+          </label>
+          <label class="all-day-option">
+            <input type="checkbox" id="dialogAllDay" name="allDay" />
+            終日
+          </label>
+        </div>
+
+        <label>
+          タイトル
+          <input type="text" id="dialogTitleInput" name="title" placeholder="例：打ち合わせ" />
+        </label>
+        <label>
+          メモ
+          <textarea id="dialogMemo" name="memo" placeholder="例：詳細メモ"></textarea>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn-primary" id="saveBtn">保存</button>
+        <button type="button" class="btn-danger" id="deleteBtn">削除</button>
+        <button type="button" class="btn-secondary" id="cancelBtn">キャンセル</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 定期的な予定用ダイアログ -->
+  <dialog id="repeatDialog">
+    <form id="repeatForm">
+      <div class="dialog-body">
+        <h3>定期的な予定を作成</h3>
+
+        <label>
+          部署
+          <input type="text" id="repeatDeptDisplay" readonly />
+        </label>
+
+        <label>
+          メンバー（複数選択可）
+          <div id="repeatMemberGroup" class="member-checkbox-group"></div>
+        </label>
+
+        <fieldset class="tag-field">
+          <legend>パターン</legend>
+          <div class="weekday-checkboxes">
+            <label><input type="radio" name="repeatMode" value="weekly" checked />週毎</label>
+            <label><input type="radio" name="repeatMode" value="monthly" />月毎</label>
+          </div>
+        </fieldset>
+
+        <!-- 週毎 -->
+        <div id="weeklyFields">
+          <label>
+            開始日
+            <input type="date" id="repeatStartDate" />
+          </label>
+          <label>
+            繰り返し間隔（週）
+            <select id="repeatWeeklyInterval">
+              <option value="1">1週間ごと</option>
+              <option value="2">2週間ごと</option>
+              <option value="3">3週間ごと</option>
+              <option value="4">4週間ごと</option>
+            </select>
+          </label>
+          <label>
+            曜日
+            <div class="weekday-checkboxes" id="repeatWeekdayGroup">
+              <label><input type="checkbox" data-week-index="0" />月</label>
+              <label><input type="checkbox" data-week-index="1" />火</label>
+              <label><input type="checkbox" data-week-index="2" />水</label>
+              <label><input type="checkbox" data-week-index="3" />木</label>
+              <label><input type="checkbox" data-week-index="4" />金</label>
+              <label><input type="checkbox" data-week-index="5" />土</label>
+              <label><input type="checkbox" data-week-index="6" />日</label>
+            </div>
+          </label>
+          <label>
+            回数
+            <input type="number" id="repeatCount" min="1" value="4" />
+          </label>
+        </div>
+
+        <!-- 月毎 -->
+        <div id="monthlyFields" hidden>
+          <label>
+            開始日
+            <input type="date" id="repeatMonthStartDate" />
+          </label>
+          <label>
+            回数
+            <input type="number" id="repeatMonthCount" min="1" value="6" />
+          </label>
+        </div>
+
+        <!-- 時間／終日 -->
+        <div class="time-row">
+          <label class="time-select-group">
+            開始時間
+            <div class="time-selectors">
+              <select id="repeatStartHour">
+                <option value="">--</option>
+                <option value="00">00</option><option value="01">01</option><option value="02">02</option>
+                <option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                <option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                <option value="09">09</option><option value="10">10</option><option value="11">11</option>
+                <option value="12">12</option><option value="13">13</option><option value="14">14</option>
+                <option value="15">15</option><option value="16">16</option><option value="17">17</option>
+                <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+              </select>
+              <span>:</span>
+              <select id="repeatStartMinute" disabled>
+                <option value="">--</option>
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
+          </label>
+          <label class="time-select-group">
+            終了時間
+            <div class="time-selectors">
+              <select id="repeatEndHour">
+                <option value="">--</option>
+                <option value="00">00</option><option value="01">01</option><option value="02">02</option>
+                <option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                <option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                <option value="09">09</option><option value="10">10</option><option value="11">11</option>
+                <option value="12">12</option><option value="13">13</option><option value="14">14</option>
+                <option value="15">15</option><option value="16">16</option><option value="17">17</option>
+                <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+              </select>
+              <span>:</span>
+              <select id="repeatEndMinute" disabled>
+                <option value="">--</option>
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
+          </label>
+          <label class="all-day-option">
+            <input type="checkbox" id="repeatAllDay" />
+            終日
+          </label>
+        </div>
+
+        <!-- タグ -->
+        <fieldset class="tag-field">
+          <legend>タグ（任意）</legend>
+          <div class="tag-options" id="repeatTagOptions">
+            <label class="repeat-tag-option" data-repeat-tag-value=""><input type="radio" name="repeatTag" value="" />なし</label>
+            <label class="repeat-tag-option" data-repeat-tag-value="guest"><input type="radio" name="repeatTag" value="guest" />来客</label>
+            <label class="repeat-tag-option" data-repeat-tag-value="meeting"><input type="radio" name="repeatTag" value="meeting" />会議</label>
+            <label class="repeat-tag-option" data-repeat-tag-value="outing"><input type="radio" name="repeatTag" value="outing" />外出</label>
+            <label class="repeat-tag-option" data-repeat-tag-value="holiday"><input type="radio" name="repeatTag" value="holiday" />休日</label>
+          </div>
+        </fieldset>
+
+        <label>
+          タイトル
+          <input type="text" id="repeatTitle" placeholder="例：定期ミーティング" />
+        </label>
+        <label>
+          メモ
+          <textarea id="repeatMemo" placeholder="例：共通メモ（必要なら）"></textarea>
+        </label>
+        <p class="help-text">
+          ※ここで設定した時間・タグが、すべての繰り返し予定に反映されます。
+        </p>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn-primary">まとめて作成</button>
+        <button type="button" class="btn-secondary" id="repeatCancelBtn">キャンセル</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ① Firebaseのライブラリを読み込む -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
+
+  <!-- ② あなたの firebaseConfig を設定して、Firestore を使えるようにする -->
+  <script>
+    // ★ここを Firebase の画面に出ていたものに置き換えてください
+    const firebaseConfig = {
+    apiKey: "AIzaSyAR6PPEV1ZLm_0MWoiQIOb0QMrHNote2yM",
+    authDomain: "schedule-app-be229.firebaseapp.com",
+    projectId: "schedule-app-be229",
+    storageBucket: "schedule-app-be229.firebasestorage.app",
+    messagingSenderId: "1944489126",
+    appId: "1:1944489126:web:977daa5654c96b31dc7867"
+  };
+
+    // Firebase を初期化して、Firestore の db を作る
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+
+
+  <script>
+    // ================================
+    // 簡易ログイン設定
+    // ================================
+    const LOGIN_ID = "1111";     // ←好きな共通IDに変更OK
+    const LOGIN_PW = "1111";   // ←社内で共有する共通パスワード
+
+    const loginSection = document.getElementById("loginSection");
+    const appSection   = document.getElementById("appSection");
+    const loginIdInput = document.getElementById("loginId");
+    const loginPwInput = document.getElementById("loginPw");
+    const loginBtn     = document.getElementById("loginBtn");
+    const loginError   = document.getElementById("loginError");
+
+    // すでにログイン済みなら、いきなりアプリ本体を表示
+    if (sessionStorage.getItem("loggedIn") === "true") {
+      loginSection.style.display = "none";
+      appSection.style.display = "block";
+      window.scrollTo(0, 0);
+    }
+
+    // ログインボタンクリック時
+    loginBtn.addEventListener("click", () => {
+      const id = loginIdInput.value.trim();
+      const pw = loginPwInput.value.trim();
+
+      if (id === LOGIN_ID && pw === LOGIN_PW) {
+        sessionStorage.setItem("loggedIn", "true");
+
+        // ログイン画面を消してアプリ本体を表示
+        loginSection.style.display = "none";
+        appSection.style.display = "block";
+        loginError.textContent = "";
+
+        window.scrollTo(0, 0);  // 念のため一番上までスクロール
+      } else {
+        loginError.textContent = "IDまたはパスワードが違います。";
+      }
+    });
+
+    // Enterキーでもログインできるように
+    [loginIdInput, loginPwInput].forEach((input) => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          loginBtn.click();
+        }
+      });
+    });
+    const STORAGE_KEY = "multiUserWeekSchedulesV3";
+
+    // ★ここを実際のメンバーに変更してください（dept: "生産係" / "生産技術"）
+    const MEMBERS = [
+      { id: "p1", name: "村上智", dept: "生産係" },
+      { id: "p2", name: "森田貴子", dept: "生産係" },
+      { id: "p3", name: "渡邉聡子", dept: "生産係" },
+      { id: "p4", name: "大塚教慎", dept: "生産係" },
+      { id: "p5", name: "海老あや子", dept: "生産係" },
+      { id: "p6", name: "伊東尚司", dept: "生産係" },
+      { id: "p7", name: "佐藤隆幸", dept: "生産係" },
+      { id: "p8", name: "小栗孝之", dept: "生産係" },
+      { id: "e1", name: "大原健", dept: "生産技術" },
+      { id: "e2", name: "池田学", dept: "生産技術" },
+      { id: "e3", name: "髙野亮", dept: "生産技術" },
+      { id: "e4", name: "巣山晃一", dept: "生産技術" },
+      { id: "e5", name: "長村優吾", dept: "生産技術" },
+    ];
+
+    const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+
+    // ★タグ色を調整（青と緑をはっきり分ける）
+    const TAG_OPTIONS = [
+      { value: "guest",   label: "来客", border: "#2563eb", background: "rgba(37, 99, 235, 0.12)" },
+      { value: "meeting", label: "会議", border: "#d97706", background: "rgba(217, 119, 6, 0.10)" },
+      { value: "outing",  label: "外出", border: "#16a34a", background: "rgba(22, 163, 74, 0.22)" },
+      { value: "holiday", label: "休日", border: "#ef4444", background: "rgba(239, 68, 68, 0.14)" }
+    ];
+    const DEFAULT_TAG_STYLE = { border: "#94a3b8", background: "#e5e7eb" };
+    const QUARTER_MINUTES = [0, 15, 30, 45];
+
+    const rangeLabel = document.getElementById("rangeLabel");
+    const weekTitleMain = document.getElementById("weekTitleMain");
+    const weekTitleSub = document.getElementById("weekTitleSub");
+    const memberGrid = document.getElementById("memberGrid");
+
+    const weekPrevWeekBtn = document.getElementById("weekPrevWeekBtn");
+    const weekNextWeekBtn = document.getElementById("weekNextWeekBtn");
+    const weekPrevDayBtn = document.getElementById("weekPrevDayBtn");
+    const weekNextDayBtn = document.getElementById("weekNextDayBtn");
+    const weekTodayBtn = document.getElementById("weekTodayBtn");
+    const printBtn = document.getElementById("printBtn");
+    const deptSwitch = document.getElementById("deptSwitch");
+    const openRepeatBtn = document.getElementById("openRepeatBtn");
+    const weekendToggleBtn = document.getElementById("weekendToggleBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const monthShell = document.getElementById("monthShell");
+    const monthGrid = document.getElementById("monthGrid");
+    const monthTitleEl = document.getElementById("monthTitle");
+    const monthMemberLabel = document.getElementById("monthMemberLabel");
+    const monthPrevBtn = document.getElementById("monthPrevBtn");
+    const monthNextBtn = document.getElementById("monthNextBtn");
+    const monthThisBtn = document.getElementById("monthThisBtn");
+
+    const scheduleDialog = document.getElementById("scheduleDialog");
+    const scheduleForm = document.getElementById("scheduleForm");
+    const dialogHeading = document.getElementById("dialogHeading");
+    const dialogUserName = document.getElementById("dialogUserName");
+    const dialogUserId = document.getElementById("dialogUserId");
+    const dialogStartDate = document.getElementById("dialogStartDate");
+    const dialogEndDate = document.getElementById("dialogEndDate");
+    const dialogStartHour = document.getElementById("dialogStartHour");
+    const dialogStartMinute = document.getElementById("dialogStartMinute");
+    const dialogEndHour = document.getElementById("dialogEndHour");
+    const dialogEndMinute = document.getElementById("dialogEndMinute");
+    const dialogAllDay = document.getElementById("dialogAllDay");
+    const dialogTitleInput = document.getElementById("dialogTitleInput");
+    const dialogMemo = document.getElementById("dialogMemo");
+    const tagInputs = Array.from(document.querySelectorAll('input[name="tag"]'));
+    const tagLabels = Array.from(document.querySelectorAll('.tag-option'));
+    const saveBtn = document.getElementById("saveBtn");
+    const deleteBtn = document.getElementById("deleteBtn");
+    const cancelBtn = document.getElementById("cancelBtn");
+
+    deleteBtn.style.display = "none";
+
+    // 定期予定ダイアログ関連
+    const repeatDialog = document.getElementById("repeatDialog");
+    const repeatForm = document.getElementById("repeatForm");
+    const repeatDeptDisplay = document.getElementById("repeatDeptDisplay");
+    const repeatMemberGroup = document.getElementById("repeatMemberGroup");
+    const repeatModeInputs = Array.from(document.querySelectorAll('input[name="repeatMode"]'));
+    const weeklyFields = document.getElementById("weeklyFields");
+    const monthlyFields = document.getElementById("monthlyFields");
+    const repeatStartDate = document.getElementById("repeatStartDate");
+    const repeatWeeklyInterval = document.getElementById("repeatWeeklyInterval");
+    const repeatWeekdayGroup = document.getElementById("repeatWeekdayGroup");
+    const repeatCount = document.getElementById("repeatCount");
+    const repeatMonthStartDate = document.getElementById("repeatMonthStartDate");
+    const repeatMonthCount = document.getElementById("repeatMonthCount");
+    const repeatTitle = document.getElementById("repeatTitle");
+    const repeatMemo = document.getElementById("repeatMemo");
+    const repeatCancelBtn = document.getElementById("repeatCancelBtn");
+    const repeatAllDay = document.getElementById("repeatAllDay");
+    const repeatStartHour = document.getElementById("repeatStartHour");
+    const repeatStartMinute = document.getElementById("repeatStartMinute");
+    const repeatEndHour = document.getElementById("repeatEndHour");
+    const repeatEndMinute = document.getElementById("repeatEndMinute");
+    const repeatTagInputs = Array.from(document.querySelectorAll('input[name="repeatTag"]'));
+    const repeatTagLabels = Array.from(document.querySelectorAll('.repeat-tag-option'));
+
+    const timeSelectorPairs = [
+      { hour: dialogStartHour, minute: dialogStartMinute },
+      { hour: dialogEndHour, minute: dialogEndMinute },
+    ];
+    const startTimePair = timeSelectorPairs[0];
+    const endTimePair = timeSelectorPairs[1];
+
+    const repeatTimePairs = [
+      { hour: repeatStartHour, minute: repeatStartMinute },
+      { hour: repeatEndHour, minute: repeatEndMinute },
+    ];
+    const repeatStartTimePair = repeatTimePairs[0];
+    const repeatEndTimePair = repeatTimePairs[1];
+
+    const today = new Date();
+
+    // ★「週の先頭=今日」に修正
+    let weekStartDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    let currentDepartment = "生産係";
+
+    let monthFocusDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    let activeMonthMemberId = null;
+
+    // ★最初は空配列だけ用意しておく
+    let schedules = [];
+    let editingId = null;
+    let dragState = null;
+
+    // ★土日表示フラグ
+    let showWeekend = true;
+
+    // 初期化（async関数）を呼び出す
+    init();
+
+    // Firestoreから予定を読んでから描画する
+    async function init() {
+      setupEvents();
+      updateWeekendToggleLabel();
+
+      // ここでクラウドから予定一覧を取得
+      schedules = await loadSchedules();
+
+      renderWeekView();
+      if (activeMonthMemberId) {
+        renderMonthView();
+      }
+    }
+
+    function getMembersForCurrentDept() {
+      return MEMBERS.filter((m) => m.dept === currentDepartment);
+    }
+
+    function findMemberById(id) {
+      return MEMBERS.find((m) => m.id === id);
+    }
+
+    function setupEvents() {
+      weekPrevWeekBtn.addEventListener("click", () => shiftWindow(-7));
+      weekNextWeekBtn.addEventListener("click", () => shiftWindow(7));
+      weekPrevDayBtn.addEventListener("click", () => shiftWindow(-1));
+      weekNextDayBtn.addEventListener("click", () => shiftWindow(1));
+
+      // ★「今日」ボタンも「今日を先頭」に
+      weekTodayBtn.addEventListener("click", () => {
+        const now = new Date();
+        weekStartDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        renderWeekView();
+      });
+
+      if (printBtn) {
+        printBtn.addEventListener("click", () => {
+          window.print();
+        });
+      }
+
+ // ログアウトボタン
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", () => {
+          // ログイン状態をクリア
+          sessionStorage.removeItem("loggedIn");
+          // 画面をリロードしてログイン画面に戻る
+          window.location.reload();
+        });
+      }
+
+      if (deptSwitch) {
+        deptSwitch.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-dept]");
+          if (!btn) return;
+          currentDepartment = btn.dataset.dept;
+          Array.from(deptSwitch.querySelectorAll("button")).forEach((b) => {
+            b.classList.toggle("active", b === btn);
+          });
+          renderWeekView();
+          if (activeMonthMemberId) {
+            const member = findMemberById(activeMonthMemberId);
+            if (!member || member.dept !== currentDepartment) {
+              activeMonthMemberId = null;
+              monthShell.hidden = true;
+            } else {
+              renderMonthView();
+            }
+          }
+        });
+      }
+
+      // ★土日トグル
+      if (weekendToggleBtn) {
+        weekendToggleBtn.addEventListener("click", () => {
+          showWeekend = !showWeekend;
+          updateWeekendToggleLabel();
+          renderWeekView();
+        });
+      }
+
+      if (monthPrevBtn) {
+        monthPrevBtn.addEventListener("click", () => {
+          monthFocusDate = addMonths(monthFocusDate, -1);
+          renderMonthView();
+        });
+      }
+      if (monthNextBtn) {
+        monthNextBtn.addEventListener("click", () => {
+          monthFocusDate = addMonths(monthFocusDate, 1);
+          renderMonthView();
+        });
+      }
+      if (monthThisBtn) {
+        monthThisBtn.addEventListener("click", () => {
+          monthFocusDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          renderMonthView();
+        });
+      }
+
+      dialogStartDate.addEventListener("change", () => {
+        if (!dialogStartDate.value) return;
+        if (!dialogEndDate.value || dialogEndDate.value < dialogStartDate.value) {
+          dialogEndDate.value = dialogStartDate.value;
+        }
+      });
+
+      timeSelectorPairs.forEach((pair) => {
+        pair.hour.addEventListener("change", () => syncTimeSelectorPair(pair));
+        pair.minute.addEventListener("change", () => syncTimeSelectorPair(pair));
+      });
+
+      dialogAllDay.addEventListener("change", () => {
+        syncAllTimeSelectors();
+      });
+
+      scheduleForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const startDate = dialogStartDate.value;
+        const endDateRaw = dialogEndDate.value;
+
+        if (!dialogUserId.value) {
+          alert("担当者が取得できませんでした。");
+          return;
+        }
+        if (!startDate || !endDateRaw) {
+          alert("開始日と終了日を入力してください。");
+          return;
+        }
+
+        const normalizedEnd = endDateRaw >= startDate ? endDateRaw : startDate;
+        const allDay = dialogAllDay.checked;
+
+        const payload = {
+          userId: dialogUserId.value,
+          startDate,
+          endDate: normalizedEnd,
+          startTime: allDay ? "" : getTimeFromPair(startTimePair),
+          endTime: allDay ? "" : getTimeFromPair(endTimePair),
+          allDay,
+          title: dialogTitleInput.value.trim(),
+          memo: dialogMemo.value.trim(),
+          tag: getSelectedTag(),
+        };
+
+        if (editingId) {
+          const target = schedules.find((item) => item.id === editingId);
+          if (target) {
+            Object.assign(target, {
+              id: editingId,
+              ...payload,
+            });
+          }
+        } else {
+          schedules.push({
+            id: Date.now().toString(),
+            ...payload,
+          });
+        }
+
+        saveSchedules();
+        closeScheduleDialog();
+        renderWeekView();
+        if (activeMonthMemberId) {
+          renderMonthView();
+        }
+      });
+
+      deleteBtn.addEventListener("click", async () => {
+        if (!editingId) return;
+
+        const ok = confirm("この予定を削除しますか？");
+        if (!ok) return;
+
+        // 1. ローカルの配列から削除
+        schedules = schedules.filter((item) => item.id !== editingId);
+
+        // 2. Firestore からも削除
+        await deleteScheduleFromFirestore(editingId);
+
+        // 3. 画面を更新
+        closeScheduleDialog();
+        renderWeekView();
+        if (activeMonthMemberId) {
+          renderMonthView();
+        }
+      });
+
+      cancelBtn.addEventListener("click", () => {
+        closeScheduleDialog();
+      });
+
+      scheduleDialog.addEventListener("close", () => {
+        resetDialog();
+      });
+
+      tagInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          updateTagActiveState();
+        });
+      });
+
+      syncAllTimeSelectors();
+
+      // 定期予定ボタン
+      if (openRepeatBtn) {
+        openRepeatBtn.addEventListener("click", () => {
+          openRepeatDialog();
+        });
+      }
+
+      // 定期予定モード切替
+      repeatModeInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          syncRepeatMode();
+        });
+      });
+
+      // 定期予定キャンセル
+      repeatCancelBtn.addEventListener("click", () => {
+        closeRepeatDialog();
+      });
+
+      repeatForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        handleRepeatSubmit();
+      });
+
+      repeatDialog.addEventListener("close", () => {
+        resetRepeatDialog();
+      });
+
+      // 定期予定：時間・終日
+      repeatTimePairs.forEach((pair) => {
+        pair.hour.addEventListener("change", () => syncRepeatTimePair(pair));
+        pair.minute.addEventListener("change", () => syncRepeatTimePair(pair));
+      });
+      repeatAllDay.addEventListener("change", () => {
+        syncAllRepeatTimeSelectors();
+      });
+
+      // 定期予定：タグ
+      repeatTagInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          updateRepeatTagActiveState();
+        });
+      });
+
+      // 初期同期
+      syncAllRepeatTimeSelectors();
+      updateRepeatTagActiveState();
+    }
+
+    function shiftWindow(days) {
+      const delta = Number(days);
+      if (Number.isNaN(delta)) return;
+      weekStartDate = addDays(weekStartDate, delta);
+      renderWeekView();
+    }
+
+    function renderWeekView() {
+      const base = new Date(
+        weekStartDate.getFullYear(),
+        weekStartDate.getMonth(),
+        weekStartDate.getDate()
+      );
+      weekStartDate = base;
+      const weekEnd = addDays(base, 6);
+
+      const startLabel = `${base.getFullYear()}年${base.getMonth() + 1}月${base.getDate()}日`;
+      const endLabel = `${weekEnd.getFullYear()}年${weekEnd.getMonth() + 1}月${weekEnd.getDate()}日`;
+      rangeLabel.textContent = `${startLabel} 〜 ${endLabel}`;
+
+      const startMonthText = `${base.getFullYear()}年${base.getMonth() + 1}月`;
+      const endMonthText = `${weekEnd.getFullYear()}年${weekEnd.getMonth() + 1}月`;
+      weekTitleMain.textContent = startMonthText === endMonthText ? startMonthText : `${startMonthText} 〜 ${endMonthText}`;
+      weekTitleSub.textContent = `${startLabel} 〜 ${endLabel}`;
+
+      memberGrid.innerHTML = "";
+
+      // ★表示する列数を切り替え（7 or 5）
+      memberGrid.style.gridTemplateColumns = showWeekend
+        ? "180px repeat(7, minmax(120px, 1fr))"
+        : "180px repeat(5, minmax(120px, 1fr))";
+
+      const corner = document.createElement("div");
+      corner.className = "member-header-cell";
+      corner.textContent = "メンバー / 日付";
+      memberGrid.appendChild(corner);
+
+      const weekDates = [];
+      for (let i = 0; i < 7; i++) {
+        weekDates.push(addDays(base, i));
+      }
+
+      // ★表示対象の日付（平日モードなら土日を除外）
+      const displayDates = weekDates.filter((d) =>
+        showWeekend || (d.getDay() !== 0 && d.getDay() !== 6)
+      );
+
+      displayDates.forEach((date) => {
+        const headerCell = document.createElement("div");
+        headerCell.className = "member-header-cell";
+        const weekday = WEEKDAY_LABELS[date.getDay()];
+        if (date.getDay() === 0) headerCell.classList.add("sun");
+        if (date.getDay() === 6) headerCell.classList.add("sat");
+        headerCell.innerHTML = `
+          <div>${date.getMonth() + 1}/${date.getDate()}</div>
+          <div class="weekday">${weekday}</div>
+        `;
+        memberGrid.appendChild(headerCell);
+      });
+
+      const members = getMembersForCurrentDept();
+
+      members.forEach((member) => {
+        const nameCell = document.createElement("div");
+        nameCell.className = "member-name-cell";
+
+        const mainSpan = document.createElement("span");
+        mainSpan.className = "member-name-main";
+        mainSpan.textContent = member.name;
+
+        const monthBtn = document.createElement("button");
+        monthBtn.type = "button";
+        monthBtn.className = "member-month-btn";
+        monthBtn.textContent = "月表示";
+        monthBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openMemberMonth(member);
+        });
+
+        nameCell.appendChild(mainSpan);
+        nameCell.appendChild(monthBtn);
+        memberGrid.appendChild(nameCell);
+
+        displayDates.forEach((date) => {
+          const cell = document.createElement("div");
+          cell.className = "day-cell";
+          const iso = formatInputDate(date);
+          cell.dataset.date = iso;
+          cell.dataset.userId = member.id;
+
+          if (isSameDate(date, today)) {
+            cell.classList.add("today");
+          }
+
+          const label = document.createElement("div");
+          label.className = "day-label";
+          label.textContent = `${date.getMonth() + 1}/${date.getDate()}`;
+          cell.appendChild(label);
+
+          const stack = document.createElement("div");
+          stack.className = "event-stack";
+
+          const cellSchedules = schedules.filter((s) =>
+            s.userId === member.id &&
+            parseISODate(s.startDate) <= date &&
+            parseISODate(s.endDate) >= date
+          );
+
+          cellSchedules.sort((a, b) => {
+            const at = a.startTime || "24:00";
+            const bt = b.startTime || "24:00";
+            return at.localeCompare(bt);
+          });
+
+          cellSchedules.forEach((s) => {
+            const bar = buildEventBar(s, date);
+            if (bar) {
+              stack.appendChild(bar);
+            }
+          });
+
+          cell.appendChild(stack);
+
+          cell.addEventListener("dblclick", () => {
+            openCreateDialog(member, iso);
+          });
+
+          cell.addEventListener("dragover", handleCellDragOver);
+          cell.addEventListener("drop", handleCellDrop);
+
+          memberGrid.appendChild(cell);
+        });
+      });
+    }
+
+    function updateWeekendToggleLabel() {
+      weekendToggleBtn.textContent = showWeekend ? "土日：表示中" : "土日：非表示";
+    }
+
+    function openMemberMonth(member) {
+      activeMonthMemberId = member.id;
+      monthFocusDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      renderMonthView();
+      monthShell.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderMonthView() {
+      if (!activeMonthMemberId) {
+        monthShell.hidden = true;
+        return;
+      }
+      const member = findMemberById(activeMonthMemberId);
+      if (!member) {
+        monthShell.hidden = true;
+        return;
+      }
+      monthShell.hidden = false;
+
+      const year = monthFocusDate.getFullYear();
+      const month = monthFocusDate.getMonth();
+
+      monthTitleEl.textContent = `${year}年${month + 1}月`;
+      monthMemberLabel.textContent = `${member.dept} / ${member.name} の予定`;
+
+      const firstOfMonth = new Date(year, month, 1);
+      const lastOfMonth = new Date(year, month + 1, 0);
+      const firstWeekStart = getStartOfWeek(firstOfMonth);
+
+      monthGrid.innerHTML = "";
+
+      const headerRow = document.createElement("div");
+      headerRow.className = "month-row month-weekday-row";
+      for (let i = 0; i < 7; i++) {
+        const cell = document.createElement("div");
+        cell.className = "day-cell";
+        const label = document.createElement("div");
+        label.className = "day-label";
+        label.textContent = WEEKDAY_LABELS[i];
+        cell.appendChild(label);
+        headerRow.appendChild(cell);
+      }
+      monthGrid.appendChild(headerRow);
+
+      let cursor = new Date(firstWeekStart);
+      for (let week = 0; week < 6; week++) {
+        const row = document.createElement("div");
+        row.className = "month-row";
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(cursor);
+          const cell = document.createElement("div");
+          cell.className = "day-cell month-day-cell";
+          const iso = formatInputDate(date);
+          cell.dataset.date = iso;
+
+          if (date.getMonth() !== month) {
+            cell.classList.add("outside-month");
+          }
+          if (isSameDate(date, today)) {
+            cell.classList.add("today");
+          }
+
+          const label = document.createElement("div");
+          label.className = "day-label";
+          label.textContent = date.getDate();
+          cell.appendChild(label);
+
+          const stack = document.createElement("div");
+          stack.className = "event-stack";
+
+          const cellSchedules = schedules.filter((s) =>
+            s.userId === activeMonthMemberId &&
+            parseISODate(s.startDate) <= date &&
+            parseISODate(s.endDate) >= date
+          );
+
+          cellSchedules.sort((a, b) => {
+            const at = a.startTime || "24:00";
+            const bt = b.startTime || "24:00";
+            return at.localeCompare(bt);
+          });
+
+          cellSchedules.forEach((s) => {
+            const bar = buildEventBar(s, date);
+            if (bar) {
+              stack.appendChild(bar);
+            }
+          });
+
+          cell.appendChild(stack);
+
+          cell.addEventListener("dblclick", () => {
+            openCreateDialog(member, iso);
+          });
+
+          // 月ビューでもドラッグ＆ドロップで移動
+          cell.addEventListener("dragover", handleMonthCellDragOver);
+          cell.addEventListener("drop", handleMonthCellDrop);
+
+          row.appendChild(cell);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        monthGrid.appendChild(row);
+        if (cursor > lastOfMonth && cursor.getDay() === 1) break;
+      }
+    }
+
+    // ★タグ＋タイトルの表示ロジックをここで制御
+    function buildEventBar(schedule, date) {
+      const bar = document.createElement("div");
+      bar.className = "event-bar";
+
+      const style = resolveTagStyle(schedule.tag);
+      bar.style.borderLeftColor = style.border;
+      bar.style.background = style.background;
+
+      const timeText = formatScheduleTimeForDate(schedule, date);
+      if (timeText) {
+        const timeEl = document.createElement("div");
+        timeEl.className = "time";
+        timeEl.textContent = timeText;
+        bar.appendChild(timeEl);
+      }
+
+      const rawTitle = (schedule.title || "").trim();
+      let displayTitle = "";
+
+      if (schedule.tag) {
+        const tagDef = TAG_OPTIONS.find(t => t.value === schedule.tag);
+        const tagLabel = tagDef ? tagDef.label : "";
+        if (tagLabel && rawTitle) {
+          // 例）来客：打ち合わせ
+          displayTitle = `${tagLabel}：${rawTitle}`;
+        } else if (tagLabel && !rawTitle) {
+          // 例）来客
+          displayTitle = tagLabel;
+        } else if (!tagLabel && rawTitle) {
+          // 万一ラベルが見つからなかった場合はタイトルのみ
+          displayTitle = rawTitle;
+        } else {
+          displayTitle = "";
+        }
+      } else {
+        // タグなし → タイトルだけ（空なら何も表示しない）
+        displayTitle = rawTitle;
+      }
+
+      if (displayTitle) {
+        const titleEl = document.createElement("div");
+        titleEl.className = "title";
+        titleEl.textContent = displayTitle;
+        bar.appendChild(titleEl);
+      } else {
+        // タイトルもタグラベルも何もない場合、
+        // 時間だけのバーでもよければこのまま（timeTextがあれば表示は残る）
+        if (!timeText) {
+          // 時間もない・完全に空なら要素自体を返さない
+          return null;
+        }
+      }
+
+      bar.dataset.scheduleId = schedule.id;
+      bar.setAttribute("draggable", "true");
+
+      bar.addEventListener("click", (event) => {
+        if (dragState?.active) return;
+        openEditDialog(schedule.id);
+        event.stopPropagation();
+      });
+
+      bar.addEventListener("dragstart", (event) => {
+        dragState = {
+          active: true,
+          scheduleId: schedule.id,
+          sourceStartDate: schedule.startDate,
+        };
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", schedule.id);
+        bar.classList.add("dragging");
+      });
+
+      bar.addEventListener("dragend", () => {
+        bar.classList.remove("dragging");
+        dragState = null;
+      });
+
+      return bar;
+    }
+
+    function handleCellDragOver(event) {
+      if (!dragState?.active) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    function handleCellDrop(event) {
+      if (!dragState?.active) return;
+      event.preventDefault();
+      const cell = event.currentTarget;
+      const targetUserId = cell.dataset.userId;
+      const targetDate = cell.dataset.date;
+      if (!targetUserId || !targetDate) return;
+
+      const schedule = schedules.find((s) => s.id === dragState.scheduleId);
+      if (!schedule) return;
+
+      // 違うメンバーへの移動は禁止
+      if (targetUserId !== schedule.userId) {
+        dragState = null;
+        return;
+      }
+
+      const diff = differenceInDays(parseISODate(targetDate), parseISODate(dragState.sourceStartDate));
+      const newStart = addDays(parseISODate(schedule.startDate), diff);
+      const newEnd = addDays(parseISODate(schedule.endDate), diff);
+
+      schedule.startDate = formatInputDate(newStart);
+      schedule.endDate = formatInputDate(newEnd);
+
+      saveSchedules();
+      dragState = null;
+      renderWeekView();
+      if (activeMonthMemberId) {
+        renderMonthView();
+      }
+    }
+
+    function handleMonthCellDragOver(event) {
+      if (!dragState?.active) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    function handleMonthCellDrop(event) {
+      if (!dragState?.active) return;
+      event.preventDefault();
+
+      const cell = event.currentTarget;
+      const targetDate = cell.dataset.date;
+      if (!targetDate) return;
+
+      const schedule = schedules.find((s) => s.id === dragState.scheduleId);
+      if (!schedule) return;
+
+      // 月表示中のメンバー以外の予定は動かさない
+      if (schedule.userId !== activeMonthMemberId) {
+        dragState = null;
+        return;
+      }
+
+      const diff = differenceInDays(
+        parseISODate(targetDate),
+        parseISODate(dragState.sourceStartDate)
+      );
+
+      const newStart = addDays(parseISODate(schedule.startDate), diff);
+      const newEnd = addDays(parseISODate(schedule.endDate), diff);
+
+      schedule.startDate = formatInputDate(newStart);
+      schedule.endDate = formatInputDate(newEnd);
+
+      saveSchedules();
+      dragState = null;
+
+      renderWeekView();
+      renderMonthView();
+    }
+
+    function openCreateDialog(member, isoDate) {
+      editingId = null;
+      dialogHeading.textContent = "予定を登録";
+      saveBtn.textContent = "保存";
+      deleteBtn.style.display = "none";
+
+      dialogUserName.value = member.name;
+      dialogUserId.value = member.id;
+
+      const baseISO = isoDate || formatInputDate(today);
+      dialogStartDate.value = baseISO;
+      dialogEndDate.value = baseISO;
+      dialogAllDay.checked = false;
+      setTimePairValue(startTimePair, "");
+      setTimePairValue(endTimePair, "");
+      dialogTitleInput.value = "";
+      dialogMemo.value = "";
+
+      tagInputs.forEach((input) => {
+        input.checked = input.value === "";
+      });
+      updateTagActiveState();
+      syncAllTimeSelectors();
+      scheduleDialog.showModal();
+    }
+
+    function openEditDialog(scheduleId) {
+      const target = schedules.find((item) => item.id === scheduleId);
+      if (!target) return;
+      const member = findMemberById(target.userId);
+      editingId = scheduleId;
+      dialogHeading.textContent = "予定を編集";
+      saveBtn.textContent = "更新";
+      deleteBtn.style.display = "inline-flex";
+
+      dialogUserName.value = member ? member.name : "(不明)";
+      dialogUserId.value = target.userId;
+
+      dialogStartDate.value = target.startDate;
+      dialogEndDate.value = target.endDate;
+      dialogAllDay.checked = Boolean(target.allDay);
+      setTimePairValue(startTimePair, target.startTime || "");
+      setTimePairValue(endTimePair, target.endTime || "");
+      dialogTitleInput.value = target.title || "";
+      dialogMemo.value = target.memo || "";
+
+      const tagValue = target.tag || "";
+      tagInputs.forEach((input) => {
+        input.checked = input.value === tagValue;
+      });
+      updateTagActiveState();
+      syncAllTimeSelectors();
+      scheduleDialog.showModal();
+    }
+
+    function closeScheduleDialog() {
+      if (typeof scheduleDialog.close === "function") {
+        scheduleDialog.close();
+      } else {
+        scheduleDialog.removeAttribute("open");
+        scheduleDialog.dispatchEvent(new Event("close"));
+      }
+    }
+
+    function resetDialog() {
+      scheduleForm.reset();
+      editingId = null;
+      deleteBtn.style.display = "none";
+      tagInputs.forEach((input) => {
+        input.checked = input.value === "";
+      });
+      updateTagActiveState();
+      dialogAllDay.checked = false;
+      dialogUserId.value = "";
+      dialogUserName.value = "";
+      syncAllTimeSelectors();
+    }
+
+    function getSelectedTag() {
+      const selected = tagInputs.find((input) => input.checked);
+      return selected ? selected.value : "";
+    }
+
+    function updateTagActiveState() {
+      const selected = getSelectedTag();
+      tagLabels.forEach((label) => {
+        label.classList.toggle("active", label.dataset.tagValue === selected);
+      });
+    }
+
+    function resolveTagStyle(tag) {
+      if (!tag) return DEFAULT_TAG_STYLE;
+      const option = TAG_OPTIONS.find((item) => item.value === tag);
+      return option ? { border: option.border, background: option.background } : DEFAULT_TAG_STYLE;
+    }
+
+    function formatScheduleTimeForDate(schedule, date) {
+      if (schedule.allDay) return "終日";
+      const hasStart = Boolean(schedule.startTime);
+      const hasEnd = Boolean(schedule.endTime);
+      if (!hasStart && !hasEnd) return "";
+
+      const start = hasStart ? schedule.startTime.slice(0, 5) : "";
+      const end = hasEnd ? schedule.endTime.slice(0, 5) : "";
+
+      if (schedule.startDate === schedule.endDate) {
+        return `${start || "--:--"} 〜 ${end || "--:--"}`;
+      }
+
+      const isSameStart = isSameDate(parseISODate(schedule.startDate), date);
+      const isSameEnd = isSameDate(parseISODate(schedule.endDate), date);
+
+      if (isSameStart) return `${start || ""} 〜`;
+      if (isSameEnd) return `〜 ${end || ""}`;
+      return "";
+    }
+
+    function coerceQuarterValue(value) {
+      if (!value) return "";
+      const [hourStr, minuteStr] = value.split(":");
+      if (minuteStr === undefined) return value;
+      const hour = hourStr.padStart(2, "0");
+      const minuteNum = Number(minuteStr);
+      if (Number.isNaN(minuteNum)) {
+        return `${hour}:00`;
+      }
+      let closest = QUARTER_MINUTES[0];
+      let diff = Math.abs(minuteNum - closest);
+      for (let i = 1; i < QUARTER_MINUTES.length; i++) {
+        const candidate = QUARTER_MINUTES[i];
+        const candidateDiff = Math.abs(minuteNum - candidate);
+        if (candidateDiff < diff) {
+          closest = candidate;
+          diff = candidateDiff;
+        }
+      }
+      const minute = String(closest).padStart(2, "0");
+      return `${hour}:${minute}`;
+    }
+
+    function getTimeFromPair(pair) {
+      const hour = pair.hour.value;
+      if (!hour) return "";
+      const minute = pair.minute.value || "00";
+      return `${hour}:${minute}`;
+    }
+
+    function setTimePairValue(pair, value) {
+      const normalized = coerceQuarterValue(value);
+      if (!normalized) {
+        pair.hour.value = "";
+        pair.minute.value = "";
+      } else {
+        const [hour, minute] = normalized.split(":");
+        pair.hour.value = hour || "";
+        pair.minute.value = minute || "";
+      }
+      syncTimeSelectorPair(pair);
+    }
+
+    function syncAllTimeSelectors() {
+      timeSelectorPairs.forEach((pair) => syncTimeSelectorPair(pair));
+    }
+
+    function syncTimeSelectorPair(pair) {
+      if (dialogAllDay.checked) {
+        pair.hour.value = "";
+        pair.minute.value = "";
+        pair.hour.disabled = true;
+        pair.minute.disabled = true;
+        return;
+      }
+      pair.hour.disabled = false;
+      if (!pair.hour.value) {
+        pair.minute.value = "";
+        pair.minute.disabled = true;
+        return;
+      }
+      pair.minute.disabled = false;
+      if (!pair.minute.value || !QUARTER_MINUTES.includes(Number(pair.minute.value))) {
+        pair.minute.value = "00";
+      }
+    }
+
+    // ==== 定期予定の時間・タグ ====
+
+    function syncAllRepeatTimeSelectors() {
+      repeatTimePairs.forEach((pair) => syncRepeatTimePair(pair));
+    }
+
+    function syncRepeatTimePair(pair) {
+      if (repeatAllDay.checked) {
+        pair.hour.value = "";
+        pair.minute.value = "";
+        pair.hour.disabled = true;
+        pair.minute.disabled = true;
+        return;
+      }
+      pair.hour.disabled = false;
+      if (!pair.hour.value) {
+        pair.minute.value = "";
+        pair.minute.disabled = true;
+        return;
+      }
+      pair.minute.disabled = false;
+      if (!pair.minute.value || !QUARTER_MINUTES.includes(Number(pair.minute.value))) {
+        pair.minute.value = "00";
+      }
+    }
+
+    function getSelectedRepeatTag() {
+      const selected = repeatTagInputs.find((input) => input.checked);
+      return selected ? selected.value : "";
+    }
+
+    function updateRepeatTagActiveState() {
+      const selected = getSelectedRepeatTag();
+      repeatTagLabels.forEach((label) => {
+        label.classList.toggle("active", label.dataset.repeatTagValue === selected);
+      });
+    }
+
+    // Firestore から予定を読み込む版
+    async function loadSchedules() {
+      try {
+        const snapshot = await db.collection("schedules").get();
+        const list = [];
+
+        snapshot.forEach((docItem) => {
+          const data = docItem.data();
+          list.push(normalizeSchedule(data));
+        });
+
+        return list.filter(Boolean);
+      } catch (error) {
+        console.error("Firestore load error:", error);
+        return [];
+      }
+    }
+
+    function normalizeSchedule(item) {
+      if (!item) return null;
+      const start = item.startDate || item.date;
+      if (!start) return null;
+      const userId = item.userId || "";
+      if (!userId) return null;
+      const normalized = {
+        id: (item.id || Date.now()).toString(),
+        userId,
+        startDate: start,
+        endDate: item.endDate && item.endDate >= start ? item.endDate : start,
+        startTime: item.startTime || "",
+        endTime: item.endTime || "",
+        allDay: item.allDay === true || item.allDay === "true",
+        title: item.title || "",
+        memo: item.memo || "",
+        tag: item.tag || (Array.isArray(item.tags) && item.tags.length ? item.tags[0] : ""),
+      };
+      if (normalized.allDay) {
+        normalized.startTime = "";
+        normalized.endTime = "";
+      } else {
+        normalized.startTime = coerceQuarterValue(normalized.startTime);
+        normalized.endTime = coerceQuarterValue(normalized.endTime);
+      }
+      return normalized;
+    }
+
+    // Firestore に予定を保存する版
+    async function saveSchedules() {
+      try {
+        const payload = schedules.map((schedule) => ({
+          ...schedule,
+          tags: schedule.tag ? [schedule.tag] : [],
+        }));
+
+        // schedules コレクションに、id をキーにして保存
+        for (const item of payload) {
+          await db.collection("schedules")
+            .doc(item.id.toString())
+            .set(item);
+        }
+
+        console.log("Firestore saved!");
+      } catch (error) {
+        console.error("Firestore save error:", error);
+      }
+    }
+       // Firestore から1件の予定を削除する関数
+       async function deleteScheduleFromFirestore(id) {
+         try {
+           await db.collection("schedules")
+             .doc(id.toString())
+             .delete();
+           console.log("Firestore deleted:", id);
+         } catch (error) {
+           console.error("Firestore delete error:", error);
+         }
+       }
+
+    function formatInputDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function parseISODate(isoString) {
+      const [year, month, day] = isoString.split("-").map(Number);
+      return new Date(year, (month || 1) - 1, day || 1);
+    }
+
+    function addDays(date, days) {
+      const result = new Date(date);
+      result.setDate(result.getDate() + days);
+      return result;
+    }
+
+    function addMonths(date, months) {
+      return new Date(date.getFullYear(), date.getMonth() + months, 1);
+    }
+
+    function differenceInDays(a, b) {
+      const start = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+      const end = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+      return Math.round((start - end) / 86400000);
+    }
+
+    function isSameDate(a, b) {
+      return (
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+      );
+    }
+
+    function getStartOfWeek(date) {
+      const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const day = result.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      result.setDate(result.getDate() + diff);
+      return new Date(result.getFullYear(), result.getMonth(), result.getDate());
+    }
+
+    // ========= 定期的な予定関連 =========
+
+    function openRepeatDialog() {
+      const members = getMembersForCurrentDept();
+      if (!members.length) {
+        alert("現在の部署にメンバーがいません。");
+        return;
+      }
+      repeatDeptDisplay.value = currentDepartment;
+
+      // メンバーのチェックボックス生成
+      repeatMemberGroup.innerHTML = "";
+      members.forEach((m) => {
+        const label = document.createElement("label");
+        label.className = "repeat-member-item";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = m.id;
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(m.name));
+        repeatMemberGroup.appendChild(label);
+      });
+
+      const todayISO = formatInputDate(today);
+      repeatStartDate.value = todayISO;
+      repeatMonthStartDate.value = todayISO;
+
+      // 開始日の曜日に合わせてデフォルトチェック
+      const weekdayIndex = (() => {
+        const d = today.getDay(); // 0: 日 ... 6: 土
+        return d === 0 ? 6 : d - 1; // 0:月 ... 6:日 に変換
+      })();
+      Array.from(repeatWeekdayGroup.querySelectorAll("input[type='checkbox']")).forEach((cb) => {
+        cb.checked = Number(cb.dataset.weekIndex) === weekdayIndex;
+      });
+
+      repeatWeeklyInterval.value = "1";
+      repeatCount.value = "4";
+      repeatMonthCount.value = "6";
+      repeatTitle.value = "";
+      repeatMemo.value = "";
+
+      // 時間・終日初期化（終日ON）
+      repeatAllDay.checked = true;
+      repeatTimePairs.forEach((pair) => {
+        pair.hour.value = "";
+        pair.minute.value = "";
+      });
+      syncAllRepeatTimeSelectors();
+
+      // タグ初期化（なし）
+      repeatTagInputs.forEach((input) => {
+        input.checked = input.value === "";
+      });
+      updateRepeatTagActiveState();
+
+      // モード初期化
+      repeatModeInputs.forEach((input) => {
+        input.checked = input.value === "weekly";
+      });
+      syncRepeatMode();
+
+      repeatDialog.showModal();
+    }
+
+    function closeRepeatDialog() {
+      if (typeof repeatDialog.close === "function") {
+        repeatDialog.close();
+      } else {
+        repeatDialog.removeAttribute("open");
+        repeatDialog.dispatchEvent(new Event("close"));
+      }
+    }
+
+    function resetRepeatDialog() {
+      repeatForm.reset();
+      repeatMemberGroup.innerHTML = "";
+      Array.from(repeatWeekdayGroup.querySelectorAll("input[type='checkbox']")).forEach((cb) => {
+        cb.checked = false;
+      });
+      repeatTimePairs.forEach((pair) => {
+        pair.hour.value = "";
+        pair.minute.value = "";
+      });
+    }
+
+    function syncRepeatMode() {
+      const mode = getRepeatMode();
+      const isWeekly = mode === "weekly";
+      weeklyFields.hidden = !isWeekly;
+      monthlyFields.hidden = isWeekly;
+    }
+
+    function getRepeatMode() {
+      const selected = repeatModeInputs.find((input) => input.checked);
+      return selected ? selected.value : "weekly";
+    }
+
+    function handleRepeatSubmit() {
+      const memberIds = Array.from(
+        repeatMemberGroup.querySelectorAll('input[type="checkbox"]:checked')
+      ).map((cb) => cb.value);
+
+      if (!memberIds.length) {
+        alert("メンバーを1人以上選択してください。");
+        return;
+      }
+
+      const mode = getRepeatMode();
+      let totalCreatedCount = 0;
+
+      // 共通（時間・タグ）
+      const allDay = repeatAllDay.checked;
+      const repeatStartTime = allDay ? "" : getTimeFromPair(repeatStartTimePair);
+      const repeatEndTime = allDay ? "" : getTimeFromPair(repeatEndTimePair);
+      const repeatTag = getSelectedRepeatTag();
+      const title = repeatTitle.value.trim();
+      const memo = repeatMemo.value.trim();
+
+      if (mode === "weekly") {
+        const start = repeatStartDate.value;
+        if (!start) {
+          alert("開始日を入力してください。");
+          return;
+        }
+        let interval = parseInt(repeatWeeklyInterval.value, 10);
+        if (!Number.isFinite(interval) || interval < 1) interval = 1;
+        if (interval > 4) interval = 4;
+
+        const selectedWeekIndexes = Array.from(
+          repeatWeekdayGroup.querySelectorAll("input[type='checkbox']")
+        )
+          .filter((cb) => cb.checked)
+          .map((cb) => Number(cb.dataset.weekIndex));
+
+        if (!selectedWeekIndexes.length) {
+          alert("少なくとも1つの曜日を選択してください。");
+          return;
+        }
+
+        let count = parseInt(repeatCount.value, 10);
+        if (!Number.isFinite(count) || count < 1) count = 1;
+
+        const baseDate = parseISODate(start);
+        const baseWeekStart = getStartOfWeek(baseDate);
+
+        const dates = [];
+        for (let i = 0; i < count; i++) {
+          const weekBase = addDays(baseWeekStart, i * interval * 7);
+          selectedWeekIndexes.forEach((weekIndex) => {
+            const d = addDays(weekBase, weekIndex);
+            if (d < baseDate) return;
+            dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+          });
+        }
+
+        const uniqueDates = dedupeDates(dates);
+
+        memberIds.forEach((memberId) => {
+          const member = findMemberById(memberId);
+          if (!member) return;
+          uniqueDates.forEach((d, idx) => {
+            const iso = formatInputDate(d);
+            schedules.push({
+              id: (Date.now() + totalCreatedCount * 100 + idx).toString(),
+              userId: member.id,
+              startDate: iso,
+              endDate: iso,
+              allDay,
+              startTime: repeatStartTime,
+              endTime: repeatEndTime,
+              title,
+              memo,
+              tag: repeatTag,
+            });
+          });
+          totalCreatedCount += uniqueDates.length;
+        });
+      } else {
+        const start = repeatMonthStartDate.value;
+        if (!start) {
+          alert("開始日を入力してください。");
+          return;
+        }
+        let count = parseInt(repeatMonthCount.value, 10);
+        if (!Number.isFinite(count) || count < 1) count = 1;
+
+        const startDate = parseISODate(start);
+        const dayOfMonth = startDate.getDate();
+
+        const dates = [];
+        for (let i = 0; i < count; i++) {
+          const d = addMonthsKeepDay(startDate, i, dayOfMonth);
+          dates.push(d);
+        }
+
+        memberIds.forEach((memberId) => {
+          const member = findMemberById(memberId);
+          if (!member) return;
+          dates.forEach((d, idx) => {
+            const iso = formatInputDate(d);
+            schedules.push({
+              id: (Date.now() + totalCreatedCount * 100 + idx).toString(),
+              userId: member.id,
+              startDate: iso,
+              endDate: iso,
+              allDay,
+              startTime: repeatStartTime,
+              endTime: repeatEndTime,
+              title,
+              memo,
+              tag: repeatTag,
+            });
+          });
+          totalCreatedCount += dates.length;
+        });
+      }
+
+      if (totalCreatedCount === 0) {
+        alert("条件に合致する日付がありませんでした。");
+      } else {
+        saveSchedules();
+        renderWeekView();
+        if (activeMonthMemberId) {
+          renderMonthView();
+        }
+        closeRepeatDialog();
+      }
+    }
+
+    function dedupeDates(dates) {
+      const map = new Map();
+      dates.forEach((d) => {
+        const key = formatInputDate(d);
+        if (!map.has(key)) {
+          map.set(key, d);
+        }
+      });
+      return Array.from(map.values()).sort((a, b) => a - b);
+    }
+
+    function addMonthsKeepDay(baseDate, offsetMonths, targetDay) {
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth() + offsetMonths;
+      const first = new Date(year, month, 1);
+      const last = new Date(year, month + 1, 0).getDate();
+      const day = Math.min(targetDay, last);
+      return new Date(first.getFullYear(), first.getMonth(), day);
+    }
+  </script>
+ </div> <!-- ②で追加する appSection の閉じタグ -->
+</body>
+</html>
