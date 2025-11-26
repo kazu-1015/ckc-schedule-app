@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>スケジュールアプリ（週×メンバー＋月表示＋定期予定）</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <style>
     :root {
       color-scheme: light;
@@ -977,6 +978,8 @@
       </div>
       <div class="dialog-actions">
         <button type="submit" class="btn-primary" id="saveBtn">保存</button>
+        <!-- ★複製ボタンを追加 -->
+        <button type="button" class="btn-secondary" id="duplicateBtn">複製</button>
         <button type="button" class="btn-danger" id="deleteBtn">削除</button>
         <button type="button" class="btn-secondary" id="cancelBtn">キャンセル</button>
       </div>
@@ -1283,8 +1286,11 @@
     const saveBtn = document.getElementById("saveBtn");
     const deleteBtn = document.getElementById("deleteBtn");
     const cancelBtn = document.getElementById("cancelBtn");
+    const duplicateBtn = document.getElementById("duplicateBtn"); // ★複製ボタン取得
 
+    // 新規モードでは非表示にしておく
     deleteBtn.style.display = "none";
+    duplicateBtn.style.display = "none";
 
     // 定期予定ダイアログ関連
     const repeatDialog = document.getElementById("repeatDialog");
@@ -1470,18 +1476,18 @@
         syncAllTimeSelectors();
       });
 
-      scheduleForm.addEventListener("submit", (event) => {
-        event.preventDefault();
+      // ★フォーム内容から payload を作る共通関数
+      function collectDialogPayload() {
         const startDate = dialogStartDate.value;
         const endDateRaw = dialogEndDate.value;
 
         if (!dialogUserId.value) {
           alert("担当者が取得できませんでした。");
-          return;
+          return null;
         }
         if (!startDate || !endDateRaw) {
           alert("開始日と終了日を入力してください。");
-          return;
+          return null;
         }
 
         const normalizedEnd = endDateRaw >= startDate ? endDateRaw : startDate;
@@ -1499,7 +1505,18 @@
           tag: getSelectedTag(),
         };
 
+        return payload;
+      }
+
+      // 保存・更新（submit）
+      scheduleForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const payload = collectDialogPayload();
+        if (!payload) return;
+
         if (editingId) {
+          // 既存予定を上書き（更新）
           const target = schedules.find((item) => item.id === editingId);
           if (target) {
             Object.assign(target, {
@@ -1508,6 +1525,7 @@
             });
           }
         } else {
+          // 新規追加
           schedules.push({
             id: Date.now().toString(),
             ...payload,
@@ -1522,6 +1540,26 @@
         }
       });
 
+      // ★複製ボタン
+      duplicateBtn.addEventListener("click", () => {
+        // 編集中でも、新しい予定として追加する（元は触らない）
+        const payload = collectDialogPayload();
+        if (!payload) return;
+
+        schedules.push({
+          id: Date.now().toString(), // 新しいIDを採番
+          ...payload,
+        });
+
+        saveSchedules();
+        closeScheduleDialog();
+        renderWeekView();
+        if (activeMonthMemberId) {
+          renderMonthView();
+        }
+      });
+
+      // 削除ボタン
       deleteBtn.addEventListener("click", async () => {
         if (!editingId) return;
 
@@ -2019,6 +2057,7 @@
       dialogHeading.textContent = "予定を登録";
       saveBtn.textContent = "保存";
       deleteBtn.style.display = "none";
+      duplicateBtn.style.display = "none"; // ★新規では非表示
 
       dialogUserName.value = member.name;
       dialogUserId.value = member.id;
@@ -2048,6 +2087,7 @@
       dialogHeading.textContent = "予定を編集";
       saveBtn.textContent = "更新";
       deleteBtn.style.display = "inline-flex";
+      duplicateBtn.style.display = "inline-flex"; // ★編集モードでは表示
 
       dialogUserName.value = member ? member.name : "(不明)";
       dialogUserId.value = target.userId;
@@ -2082,6 +2122,7 @@
       scheduleForm.reset();
       editingId = null;
       deleteBtn.style.display = "none";
+      duplicateBtn.style.display = "none"; // ★リセット時も非表示に戻す
       tagInputs.forEach((input) => {
         input.checked = input.value === "";
       });
@@ -2611,4 +2652,3 @@
  </div> <!-- ②で追加する appSection の閉じタグ -->
 </body>
 </html>
-
