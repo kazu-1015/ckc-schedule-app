@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>スケジュールアプリ（週×メンバー＋月表示＋定期予定）</title>
+  <title>CKC Schedule</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <style>
     :root {
@@ -818,7 +818,7 @@
   <!-- ▼▼▼ アプリ本体（ここから全部を包む） ▼▼▼ -->
   <div id="appSection" style="display:none;">
   <header>
-    <h1>スケジュールアプリ（週×メンバー）</h1>
+    <h1>スケジュール</h1>
     <div class="toolbar">
       <span class="range" id="rangeLabel"></span>
 
@@ -1148,7 +1148,7 @@
 
   <!-- ② あなたの firebaseConfig を設定して、Firestore を使えるようにする -->
   <script>
-    // ★ここを Firebase の画面に出ていたものに置き換えてください
+    // ★ここを Firebaseから確認してに置き換える
     const firebaseConfig = {
     apiKey: "AIzaSyAR6PPEV1ZLm_0MWoiQIOb0QMrHNote2yM",
     authDomain: "schedule-app-be229.firebaseapp.com",
@@ -1232,6 +1232,8 @@
     ];
 
     const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+    // 月表示（列インデックス用）
+    const WEEKDAY_LABELS_MON = ["月", "火", "水", "木", "金", "土", "日"];
 
     // ★タグ色を調整（青と緑をはっきり分ける）
     const TAG_OPTIONS = [
@@ -1822,7 +1824,7 @@
         cell.className = "day-cell";
         const label = document.createElement("div");
         label.className = "day-label";
-        label.textContent = WEEKDAY_LABELS[i];
+        label.textContent = WEEKDAY_LABELS_MON[i];
         cell.appendChild(label);
         headerRow.appendChild(cell);
       }
